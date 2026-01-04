@@ -1,19 +1,15 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Transactions from './pages/Transactions';
-import Students from './pages/Students';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import Sidebar from './components/Sidebar';
-import { User, Student, Transaction, AppSettings } from './types';
+import Login from './pages/Login.tsx';
+import Dashboard from './pages/Dashboard.tsx';
+import Transactions from './pages/Transactions.tsx';
+import Students from './pages/Students.tsx';
+import Reports from './pages/Reports.tsx';
+import Settings from './pages/Settings.tsx';
+import Sidebar from './components/Sidebar.tsx';
+import { User, Student, Transaction, AppSettings } from './types.ts';
 
-/**
- * URL Google Apps Script hasil Deployment (Web App)
- * Ganti dengan URL Anda sendiri setelah melakukan Deployment di Google Sheets
- */
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzw3CXbcNftSKWdCCDc5a_RnEw7ntPRFwzEbmZXJoHKPwekdxnemPU6HNxfO_UbMASf_w/exec';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -47,59 +43,51 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
 
   const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Pastikan URL tidak kosong sebelum fetch
-      if (!GOOGLE_SCRIPT_URL.includes('macros/s/')) {
-        console.warn("URL Google Script belum diatur.");
-        setIsOnline(false);
-        setIsLoading(false);
-        return;
-      }
+    // Jika sudah ada data di cache, kita tampilkan dulu (optimistic UI)
+    if (students.length > 0) {
+      setIsLoading(false);
+    }
 
-      const response = await fetch(GOOGLE_SCRIPT_URL, { 
-        method: 'GET',
-        cache: 'no-cache'
-      });
-      
-      if (!response.ok) throw new Error("Gagal mengambil data dari server.");
-      
-      const result = await response.json();
-      
-      if (result.students) {
-        setStudents(result.students);
-        localStorage.setItem('students_cache', JSON.stringify(result.students));
-      }
-      if (result.transactions) {
-        setTransactions(result.transactions);
-        localStorage.setItem('transactions_cache', JSON.stringify(result.transactions));
-      }
-      if (result.settings && result.settings.loginTitle) {
-        setSettings({
-          ...result.settings,
-          initialKasBalance: Number(result.settings.initialKasBalance) || 0
+    try {
+      if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('macros/s/')) {
+        const response = await fetch(GOOGLE_SCRIPT_URL, { 
+          method: 'GET',
+          cache: 'no-cache'
         });
-        localStorage.setItem('app_settings', JSON.stringify(result.settings));
+        
+        if (!response.ok) throw new Error("Server error");
+        
+        const result = await response.json();
+        
+        if (result.students) {
+          setStudents(result.students);
+          localStorage.setItem('students_cache', JSON.stringify(result.students));
+        }
+        if (result.transactions) {
+          setTransactions(result.transactions);
+          localStorage.setItem('transactions_cache', JSON.stringify(result.transactions));
+        }
+        if (result.settings && result.settings.loginTitle) {
+          const formattedSettings = {
+            ...result.settings,
+            initialKasBalance: Number(result.settings.initialKasBalance) || 0
+          };
+          setSettings(formattedSettings);
+          localStorage.setItem('app_settings', JSON.stringify(formattedSettings));
+        }
+        setIsOnline(true);
       }
-      setIsOnline(true);
     } catch (error) {
-      console.warn("Berjalan dalam mode offline (Cache).", error);
+      console.warn("Gagal sinkronisasi cloud, menggunakan data offline.", error);
       setIsOnline(false);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [students.length]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  // Sync state ke local storage untuk akses offline cepat
-  useEffect(() => {
-    localStorage.setItem('students_cache', JSON.stringify(students));
-    localStorage.setItem('transactions_cache', JSON.stringify(transactions));
-    localStorage.setItem('app_settings', JSON.stringify(settings));
-  }, [students, transactions, settings]);
 
   useEffect(() => {
     if (user) {
@@ -111,8 +99,6 @@ const App: React.FC = () => {
 
   const syncToSheets = async (action: string, data: any) => {
     try {
-      // Kita gunakan mode 'no-cors' untuk POST ke Google Apps Script agar menghindari isu Preflight CORS
-      // Namun mode ini tidak akan mengembalikan response body, jadi kita asumsikan berhasil di UI.
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors', 
@@ -147,11 +133,11 @@ const App: React.FC = () => {
 
   const updateStudent = (s: Student) => {
     setStudents(prev => prev.map(item => item.id === s.id ? s : item));
-    syncToSheets('UPDATE_STUDENT', s); // Pastikan Apps Script menangani UPDATE jika diperlukan
+    syncToSheets('UPDATE_STUDENT', s);
   };
 
   const deleteStudent = (id: string) => {
-    if (window.confirm("Hapus siswa ini? Transaksi lamanya akan tetap ada namun tanpa nama.")) {
+    if (window.confirm("Hapus siswa ini?")) {
       setStudents(prev => prev.filter(s => s.id !== id));
       syncToSheets('DELETE_STUDENT', { id });
     }
@@ -174,7 +160,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-indigo-50 p-6">
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-indigo-900 font-bold">Menghubungkan ke Cloud...</p>
+        <p className="text-indigo-900 font-bold">Memuat Data...</p>
       </div>
     );
   }
@@ -189,7 +175,7 @@ const App: React.FC = () => {
               <div className="mb-4 bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center justify-between text-amber-800 text-xs font-bold animate-fadeIn">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                  <span>Mode Offline: Perubahan disimpan di HP ini dan akan disinkronkan nanti.</span>
+                  <span>Mode Offline: Menggunakan data tersimpan.</span>
                 </div>
                 <button onClick={fetchData} className="bg-white px-3 py-1 rounded-lg border border-amber-200">Segarkan</button>
               </div>
