@@ -8,19 +8,20 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-        // Menangani error loading modul agar tidak putih polos
+        window.process = { env: { NODE_ENV: 'production' } };
         window.onerror = function(msg, url, line, col, error) {
-            console.error("Global Error:", msg, error);
+            console.error("System Error:", msg, error);
             const root = document.getElementById('root');
             if (root && root.innerHTML === '') {
-                root.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;">' +
-                    '<h2 style="color:#e11d48;">Terjadi Kesalahan Memuat Sistem</h2>' +
-                    '<p style="color:#64748b;">Gagal menghubungi server library. Silakan periksa koneksi internet Anda atau coba segarkan halaman.</p>' +
-                    '<button onclick="location.reload()" style="background:#4f46e5;color:white;border:none;padding:12px 24px;border-radius:12px;cursor:pointer;font-weight:bold;margin-top:10px;">Segarkan Halaman</button>' +
-                    '</div>';
+                root.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; text-align:center; padding:20px;">
+                        <h2 style="color:#ef4444;">Gagal Memuat Aplikasi</h2>
+                        <p style="color:#64748b; max-width:400px;">Terjadi konflik library atau gangguan koneksi. Mencoba memulihkan...</p>
+                        <button onclick="location.reload()" style="margin-top:20px; padding:12px 24px; background:#4f46e5; color:white; border:none; border-radius:12px; cursor:pointer; font-weight:bold;">Refresh Halaman</button>
+                    </div>
+                `;
             }
         };
-        window.process = { env: { NODE_ENV: 'production' } };
     </script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }

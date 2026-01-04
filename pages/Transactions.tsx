@@ -12,22 +12,26 @@ interface TransactionsProps {
 const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onAdd, onDelete }) => {
   const [direction, setDirection] = useState<'IN' | 'OUT'>('IN');
   const [selectedStudent, setSelectedStudent] = useState('');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('5000'); // Default 5000
   const [inType, setInType] = useState<TransactionType>(TransactionType.KAS);
   const [outType, setOutType] = useState<TransactionType>(TransactionType.OUT_KAS);
   const [notes, setNotes] = useState('');
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
 
+  const showStudentSelect = direction === 'IN' || outType === TransactionType.OUT_TABUNGAN;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount) return;
+    if (!amount || parseInt(amount) <= 0) return;
 
-    const isTabunganRelated = (direction === 'IN' && inType === TransactionType.TABUNGAN) || 
-                              (direction === 'OUT' && outType === TransactionType.OUT_TABUNGAN);
-    
-    if ((direction === 'IN' || outType === TransactionType.OUT_TABUNGAN) && !selectedStudent && isTabunganRelated) {
+    if (showStudentSelect && !selectedStudent) {
         alert("Silakan pilih siswa terlebih dahulu.");
         return;
+    }
+
+    if (direction === 'OUT' && outType === TransactionType.OUT_KAS && !notes.trim()) {
+      alert("Keterangan wajib diisi untuk pengeluaran kas.");
+      return;
     }
 
     const finalDate = new Date(transactionDate);
@@ -35,15 +39,15 @@ const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onA
     finalDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
     onAdd({
-      studentId: selectedStudent || undefined,
+      studentId: showStudentSelect ? selectedStudent : undefined,
       amount: parseInt(amount),
       type: direction === 'IN' ? inType : outType,
       date: finalDate.toISOString(),
-      notes,
+      notes: notes.trim() || undefined,
     });
 
     setSelectedStudent('');
-    setAmount('');
+    setAmount('5000'); // Reset ke default
     setNotes('');
   };
 
@@ -55,15 +59,16 @@ const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onA
     }).format(val);
   };
 
+  const quickAmounts = [5000, 10000, 20000, 50000];
+
   return (
     <div className="space-y-6 animate-fadeIn pb-24">
       <header className="px-1">
         <h1 className="text-2xl font-black text-slate-900">Input Data</h1>
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Catat Transaksi Baru</p>
+        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Catat Transaksi Baru • Kas Rp 5.000/minggu</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Input Form Card */}
         <div className="lg:col-span-1">
           <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-8">
@@ -146,14 +151,14 @@ const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onA
                 </div>
               </div>
 
-              {(direction === 'IN' || (direction === 'OUT' && outType === TransactionType.OUT_TABUNGAN)) && (
-                <div className="space-y-1.5">
+              {showStudentSelect && (
+                <div className="space-y-1.5 animate-fadeIn">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Siswa</label>
                   <select
                     value={selectedStudent}
                     onChange={(e) => setSelectedStudent(e.target.value)}
                     className="w-full px-4 py-4 rounded-2xl bg-slate-50 border-none font-bold text-slate-700 outline-none appearance-none"
-                    required={direction === 'IN' || outType === TransactionType.OUT_TABUNGAN}
+                    required
                   >
                     <option value="">Pilih Siswa...</option>
                     {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -171,6 +176,18 @@ const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onA
                   placeholder="0"
                   required
                 />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {quickAmounts.map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setAmount(val.toString())}
+                      className="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-indigo-100 hover:text-indigo-600 transition-colors"
+                    >
+                      {val / 1000}k
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -178,9 +195,9 @@ const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onA
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-4 rounded-2xl bg-slate-50 border-none font-bold text-slate-700 outline-none h-24 resize-none"
-                  placeholder="Tulis catatan..."
-                  required={direction === 'OUT'}
+                  className="w-full px-4 py-4 rounded-2xl bg-slate-50 border-none font-bold text-slate-700 outline-none h-20 resize-none"
+                  placeholder={direction === 'OUT' ? "Wajib diisi untuk pengeluaran..." : "Opsional..."}
+                  required={direction === 'OUT' && outType === TransactionType.OUT_KAS}
                 />
               </div>
 
@@ -190,17 +207,16 @@ const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onA
                   direction === 'IN' ? 'bg-indigo-600 shadow-indigo-100' : 'bg-red-600 shadow-red-100'
                 }`}
               >
-                Simpan
+                Simpan Transaksi
               </button>
             </form>
           </div>
         </div>
 
-        {/* Transaction History - Card List for mobile */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Riwayat Terbaru</h3>
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Riwayat Transaksi</h3>
           <div className="space-y-3">
-            {transactions.map((t) => {
+            {transactions.slice(0, 15).map((t) => {
               const student = students.find(s => s.id === t.studentId);
               const isExpense = t.type === TransactionType.OUT_KAS || t.type === TransactionType.OUT_TABUNGAN;
               
@@ -236,11 +252,6 @@ const Transactions: React.FC<TransactionsProps> = ({ students, transactions, onA
                 </div>
               );
             })}
-            {transactions.length === 0 && (
-              <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-slate-100">
-                <p className="text-slate-300 font-bold uppercase tracking-widest text-xs">Belum ada transaksi</p>
-              </div>
-            )}
           </div>
         </div>
       </div>

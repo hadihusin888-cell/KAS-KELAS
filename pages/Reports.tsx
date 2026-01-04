@@ -13,6 +13,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
+  const WEEKLY_FEE = 5000;
+
   const months = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -39,7 +41,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
     const fridays: number[] = [];
     const date = new Date(selectedYear, selectedMonth, 1);
     while (date.getMonth() === selectedMonth) {
-      if (date.getDay() === 5) {
+      if (date.getDay() === 5) { // Hari Jumat
         fridays.push(date.getDate());
       }
       date.setDate(date.getDate() + 1);
@@ -49,6 +51,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
 
   const kasMatrix = useMemo(() => {
     return students.map(student => {
+      // Ambil semua transaksi KAS siswa di bulan/tahun terpilih
       const studentKas = transactions.filter(t => {
         const d = new Date(t.date);
         return t.studentId === student.id && 
@@ -57,28 +60,23 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
                d.getFullYear() === selectedYear;
       });
 
-      const weeksPaid = new Array(fridaysInMonth.length).fill(false);
+      const totalPaidThisMonth = studentKas.reduce((sum, t) => sum + t.amount, 0);
       
-      studentKas.forEach(t => {
-        const day = new Date(t.date).getDate();
-        for (let i = 0; i < fridaysInMonth.length; i++) {
-          const currentFriday = fridaysInMonth[i];
-          const prevFriday = i > 0 ? fridaysInMonth[i - 1] : 0;
-          
-          if (day > prevFriday && day <= currentFriday) {
-            weeksPaid[i] = true;
-            break;
-          }
-          if (i === fridaysInMonth.length - 1 && day > currentFriday) {
-             weeksPaid[i] = true;
-          }
+      // Logic Kelipatan: Hitung berapa minggu yang tercover (Total / 5000)
+      const weeksCovered = Math.floor(totalPaidThisMonth / WEEKLY_FEE);
+      
+      const weeksPaid = new Array(fridaysInMonth.length).fill(false);
+      for (let i = 0; i < fridaysInMonth.length; i++) {
+        if (i < weeksCovered) {
+          weeksPaid[i] = true;
         }
-      });
+      }
 
       return {
         ...student,
         weeksPaid,
-        totalMonth: studentKas.reduce((sum, t) => sum + t.amount, 0)
+        totalMonth: totalPaidThisMonth,
+        overpaid: totalPaidThisMonth % WEEKLY_FEE // Sisa jika tidak pas kelipatannya
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [students, transactions, selectedMonth, selectedYear, fridaysInMonth]);
@@ -115,7 +113,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
       <header className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">Laporan</h1>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Rekapitulasi Keuangan</p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Rekapitulasi Keuangan • Kas: {formatCurrency(WEEKLY_FEE)}/minggu</p>
         </div>
 
         <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner">
@@ -170,8 +168,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
         <div className="space-y-6">
           <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Matriks Pembayaran</h3>
-              <span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full">{fridaysInMonth.length} Minggu</span>
+              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Matriks Kas (Otomatis)</h3>
+              <span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full">Bulan: {months[selectedMonth]}</span>
             </div>
             
             <div className="overflow-x-auto relative">
@@ -180,7 +178,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
                   <tr className="bg-slate-50/50 text-slate-400 text-[9px] font-black uppercase tracking-widest border-b border-slate-100">
                     <th className="px-4 py-4 sticky left-0 z-20 bg-slate-50 min-w-[120px]">Nama Siswa</th>
                     {fridaysInMonth.map((day, idx) => (
-                      <th key={idx} className="px-4 py-4 text-center min-w-[70px]">W{idx + 1}<br/><span className="text-[8px] font-normal opacity-60">Tgl {day}</span></th>
+                      <th key={idx} className="px-4 py-4 text-center min-w-[70px]">Mgg {idx + 1}</th>
                     ))}
                     <th className="px-4 py-4 text-right min-w-[100px]">Total</th>
                   </tr>
@@ -195,7 +193,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
                         <td key={idx} className="px-2 py-4 text-center">
                           <div className="flex justify-center">
                             {paid ? (
-                              <div className="w-6 h-6 bg-indigo-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-indigo-100">
+                              <div className="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center shadow-lg shadow-emerald-100 animate-fadeIn">
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                               </div>
                             ) : (
@@ -211,6 +209,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, students, settings }) =
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-[9px] font-bold text-slate-400 uppercase italic">
+              * Centang otomatis diberikan setiap kelipatan Rp 5.000 dari total pembayaran bulan ini.
             </div>
           </div>
           
