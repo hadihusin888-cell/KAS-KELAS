@@ -10,6 +10,7 @@ import Settings from './pages/Settings.tsx';
 import Sidebar from './components/Sidebar.tsx';
 import { User, Student, Transaction, AppSettings } from './types.ts';
 
+// Pastikan URL ini benar atau kosongkan sementara untuk mode demo
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzw3CXbcNftSKWdCCDc5a_RnEw7ntPRFwzEbmZXJoHKPwekdxnemPU6HNxfO_UbMASf_w/exec';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -20,65 +21,70 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('user');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
   });
 
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('app_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    try {
+      const saved = localStorage.getItem('app_settings');
+      return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    } catch { return DEFAULT_SETTINGS; }
   });
 
   const [students, setStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem('students_cache');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('students_cache');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
   
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('transactions_cache');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('transactions_cache');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
 
   const fetchData = useCallback(async () => {
-    // Jika sudah ada data di cache, kita tampilkan dulu (optimistic UI)
-    if (students.length > 0) {
-      setIsLoading(false);
-    }
+    // Beri waktu 500ms agar user bisa melihat loading state jika cache kosong
+    if (students.length === 0) setIsLoading(true);
 
     try {
-      if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('macros/s/')) {
-        const response = await fetch(GOOGLE_SCRIPT_URL, { 
-          method: 'GET',
-          cache: 'no-cache'
-        });
-        
-        if (!response.ok) throw new Error("Server error");
-        
-        const result = await response.json();
-        
-        if (result.students) {
-          setStudents(result.students);
-          localStorage.setItem('students_cache', JSON.stringify(result.students));
-        }
-        if (result.transactions) {
-          setTransactions(result.transactions);
-          localStorage.setItem('transactions_cache', JSON.stringify(result.transactions));
-        }
-        if (result.settings && result.settings.loginTitle) {
-          const formattedSettings = {
-            ...result.settings,
-            initialKasBalance: Number(result.settings.initialKasBalance) || 0
-          };
-          setSettings(formattedSettings);
-          localStorage.setItem('app_settings', JSON.stringify(formattedSettings));
-        }
-        setIsOnline(true);
+      const response = await fetch(GOOGLE_SCRIPT_URL, { 
+        method: 'GET',
+        cache: 'no-cache'
+      });
+      
+      if (!response.ok) throw new Error("Server error");
+      
+      const result = await response.json();
+      
+      if (result.students) {
+        setStudents(result.students);
+        localStorage.setItem('students_cache', JSON.stringify(result.students));
       }
+      if (result.transactions) {
+        setTransactions(result.transactions);
+        localStorage.setItem('transactions_cache', JSON.stringify(result.transactions));
+      }
+      if (result.settings) {
+        const formattedSettings = {
+          ...DEFAULT_SETTINGS,
+          ...result.settings,
+          initialKasBalance: Number(result.settings.initialKasBalance) || 0
+        };
+        setSettings(formattedSettings);
+        localStorage.setItem('app_settings', JSON.stringify(formattedSettings));
+      }
+      setIsOnline(true);
     } catch (error) {
-      console.warn("Gagal sinkronisasi cloud, menggunakan data offline.", error);
+      console.warn("Cloud offline, menggunakan data lokal.");
       setIsOnline(false);
     } finally {
       setIsLoading(false);
@@ -107,7 +113,6 @@ const App: React.FC = () => {
       });
       setIsOnline(true);
     } catch (error) {
-      console.error(`Gagal sinkronisasi aksi ${action}:`, error);
       setIsOnline(false);
     }
   };
@@ -160,7 +165,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-indigo-50 p-6">
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-indigo-900 font-bold">Memuat Data...</p>
+        <p className="text-indigo-900 font-bold animate-pulse">Menghubungkan ke Sistem...</p>
       </div>
     );
   }
@@ -175,9 +180,9 @@ const App: React.FC = () => {
               <div className="mb-4 bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center justify-between text-amber-800 text-xs font-bold animate-fadeIn">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                  <span>Mode Offline: Menggunakan data tersimpan.</span>
+                  <span>Mode Offline: Data tersimpan secara lokal.</span>
                 </div>
-                <button onClick={fetchData} className="bg-white px-3 py-1 rounded-lg border border-amber-200">Segarkan</button>
+                <button onClick={fetchData} className="bg-white px-3 py-1 rounded-lg border border-amber-200 hover:bg-amber-100 transition-colors">Segarkan</button>
               </div>
             )}
             <Routes>
