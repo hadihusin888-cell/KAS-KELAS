@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login.tsx';
@@ -10,7 +9,6 @@ import Settings from './pages/Settings.tsx';
 import Sidebar from './components/Sidebar.tsx';
 import { User, Student, Transaction, AppSettings } from './types.ts';
 
-// Web App URL dari Google Apps Script
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzw3CXbcNftSKWdCCDc5a_RnEw7ntPRFwzEbmZXJoHKPwekdxnemPU6HNxfO_UbMASf_w/exec';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -52,25 +50,18 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
 
   const fetchData = useCallback(async () => {
-    // Tetap tampilkan loading hanya jika data lokal masih kosong
     if (students.length === 0) setIsLoading(true);
-
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 detik timeout
-
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const response = await fetch(GOOGLE_SCRIPT_URL, { 
         method: 'GET',
         cache: 'no-cache',
         signal: controller.signal
       });
-      
       clearTimeout(timeoutId);
-
       if (!response.ok) throw new Error("Server Error");
-      
       const result = await response.json();
-      
       if (result.students) {
         setStudents(result.students);
         localStorage.setItem('students_cache', JSON.stringify(result.students));
@@ -90,7 +81,7 @@ const App: React.FC = () => {
       }
       setIsOnline(true);
     } catch (error) {
-      console.warn("Koneksi gagal atau lambat, beralih ke mode offline.", error);
+      console.warn("Offline mode active.");
       setIsOnline(false);
     } finally {
       setIsLoading(false);
@@ -119,7 +110,6 @@ const App: React.FC = () => {
       });
       setIsOnline(true);
     } catch (error) {
-      console.error("Gagal sinkronisasi data:", error);
       setIsOnline(false);
     }
   };
@@ -168,13 +158,11 @@ const App: React.FC = () => {
     setUser(null);
   };
 
-  // State awal: Loading jika data lokal kosong
   if (isLoading && students.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-indigo-50 p-6">
         <div className="w-14 h-14 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
         <p className="text-indigo-900 font-bold text-lg animate-pulse">Menghubungkan ke Cloud...</p>
-        <p className="text-slate-400 text-sm mt-2">Pastikan koneksi internet stabil</p>
       </div>
     );
   }
@@ -184,19 +172,15 @@ const App: React.FC = () => {
       <div className="flex min-h-screen bg-slate-50">
         {user && <Sidebar onLogout={handleLogout} isOnline={isOnline} onRetry={fetchData} />}
         <main className={`flex-1 transition-all duration-300 ${user ? 'md:ml-64' : ''}`}>
-          <div className="container mx-auto p-4 md:p-8 max-w-7xl pb-24 md:pb-8">
+          {/* pt-20 on mobile to clear the fixed top header bar */}
+          <div className={`container mx-auto max-w-7xl px-4 md:px-8 ${user ? 'pt-20 pb-32 md:pt-8 md:pb-8' : ''}`}>
             {isOnline === false && user && (
               <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-3xl flex items-center justify-between text-amber-800 text-sm font-bold animate-fadeIn shadow-sm">
                 <div className="flex items-center space-x-3">
                   <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse"></div>
-                  <span>Mode Offline: Menggunakan data tersimpan di perangkat ini.</span>
+                  <span>Mode Offline.</span>
                 </div>
-                <button 
-                  onClick={fetchData} 
-                  className="bg-white px-4 py-2 rounded-xl border border-amber-200 hover:bg-amber-100 transition-colors shadow-sm"
-                >
-                  Coba Sinkronkan
-                </button>
+                <button onClick={fetchData} className="bg-white px-3 py-1.5 rounded-xl border border-amber-200 text-xs shadow-sm">Sinkronkan</button>
               </div>
             )}
             <Routes>
